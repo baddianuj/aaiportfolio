@@ -5,7 +5,6 @@ import {
   Database, 
   Cloud, 
   Layers,
-  Python,
   FileCode,
   Zap
 } from 'lucide-react'
