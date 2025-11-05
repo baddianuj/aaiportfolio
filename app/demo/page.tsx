@@ -1,4 +1,7 @@
+'use client'
+
 import Image from 'next/image'
+import { useState } from 'react'
 import { 
   Upload, 
   Scan, 
@@ -6,10 +9,87 @@ import {
   CheckCircle, 
   Save,
   ArrowRight,
-  PlayCircle
+  PlayCircle,
+  FileText,
+  Loader2,
+  AlertCircle
 } from 'lucide-react'
 
 export default function Demo() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [imageUrl, setImageUrl] = useState('')
+  const [preview, setPreview] = useState<string | null>(null)
+  const [processing, setProcessing] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      setImageUrl('')
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImageUrl(e.target.value)
+    if (e.target.value) {
+      setSelectedFile(null)
+      setPreview(e.target.value)
+    }
+  }
+
+  const processInvoice = async () => {
+    if (!selectedFile && !imageUrl) {
+      setError('Please select a file or enter an image URL')
+      return
+    }
+
+    setProcessing(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      const formData = new FormData()
+      if (selectedFile) {
+        formData.append('image', selectedFile)
+      }
+      if (imageUrl) {
+        formData.append('imageUrl', imageUrl)
+      }
+
+      const response = await fetch('/api/process-invoice', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process invoice')
+      }
+
+      // If demo mode, show demo result
+      if (data.demo) {
+        // Fetch demo result
+        const demoResponse = await fetch('/api/process-invoice?demo=true')
+        const demoData = await demoResponse.json()
+        setResult(demoData)
+      } else {
+        setResult(data)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to process invoice')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   const steps = [
     {
       number: 1,
@@ -53,25 +133,6 @@ export default function Demo() {
     }
   ]
 
-  const exampleOutput = {
-    vendor_name: "XYZ Software Solutions",
-    invoice_number: "INV-2025-002",
-    date: "2025-11-05",
-    line_items: [
-      {
-        description: "Software License (Annual)",
-        quantity: 2.0,
-        unit_price: 150.0,
-        amount: 300.0
-      }
-    ],
-    subtotal: 1600.0,
-    tax_amount: 1350.0,
-    total_amount: 2950.0,
-    currency: "USD",
-    confidence_score: 0.9
-  }
-
   return (
     <div className="pt-16">
       {/* Hero */}
@@ -81,6 +142,250 @@ export default function Demo() {
           <p className="text-xl text-blue-100 max-w-3xl">
             See how our AI-powered system transforms invoice images into structured data
           </p>
+        </div>
+      </section>
+
+      {/* Interactive Upload Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+              Try It Out
+            </h2>
+            <p className="text-gray-600 mb-8 text-center">
+              Upload an invoice image or enter a URL to see the extraction in action
+            </p>
+
+            <div className="space-y-6">
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Invoice Image
+                </label>
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-10 h-10 mb-3 text-gray-400" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Click to upload</span> or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500">PNG, JPG (MAX. 10MB)</p>
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
+                  </label>
+                </div>
+                {selectedFile && (
+                  <p className="mt-2 text-sm text-gray-600">Selected: {selectedFile.name}</p>
+                )}
+              </div>
+
+              {/* Or Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">OR</span>
+                </div>
+              </div>
+
+              {/* URL Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter Image URL
+                </label>
+                <input
+                  type="url"
+                  value={imageUrl}
+                  onChange={handleUrlChange}
+                  placeholder="https://example.com/invoice.png"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Preview */}
+              {preview && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preview
+                  </label>
+                  <div className="relative w-full h-64 border border-gray-300 rounded-lg overflow-hidden">
+                    <Image
+                      src={preview}
+                      alt="Invoice preview"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Process Button */}
+              <button
+                onClick={processInvoice}
+                disabled={processing || (!selectedFile && !imageUrl)}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    Processing Invoice...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="h-5 w-5 mr-2" />
+                    Process Invoice
+                  </>
+                )}
+              </button>
+
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
+                  <AlertCircle className="h-5 w-5 text-red-600 mr-3 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800">Error</h3>
+                    <p className="text-sm text-red-600 mt-1">{error}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Result Display */}
+              {result && (
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-2xl font-bold text-gray-900">Extraction Results</h3>
+                  
+                  {/* Invoice Summary */}
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Invoice Summary</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Vendor</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {result.invoice_data.vendor_name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Invoice Number</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {result.invoice_data.invoice_number || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Date</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {result.invoice_data.date || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Total Amount</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {result.invoice_data.currency} {result.invoice_data.total_amount}
+                        </p>
+                      </div>
+                    </div>
+                    {result.invoice_data.confidence_score && (
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-600">Confidence Score</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
+                          <div
+                            className="bg-green-600 h-2.5 rounded-full"
+                            style={{ width: `${result.invoice_data.confidence_score * 100}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {(result.invoice_data.confidence_score * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Line Items */}
+                  {result.invoice_data.line_items && result.invoice_data.line_items.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Line Items</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 px-4">Description</th>
+                              <th className="text-right py-2 px-4">Quantity</th>
+                              <th className="text-right py-2 px-4">Unit Price</th>
+                              <th className="text-right py-2 px-4">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {result.invoice_data.line_items.map((item: any, idx: number) => (
+                              <tr key={idx} className="border-b">
+                                <td className="py-2 px-4">{item.description}</td>
+                                <td className="text-right py-2 px-4">
+                                  {item.quantity || '-'}
+                                </td>
+                                <td className="text-right py-2 px-4">
+                                  {item.unit_price ? `$${item.unit_price}` : '-'}
+                                </td>
+                                <td className="text-right py-2 px-4 font-semibold">
+                                  ${item.amount}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validation Status */}
+                  {result.validation && (
+                    <div className={`rounded-lg p-4 ${
+                      result.validation.is_valid
+                        ? 'bg-green-50 border border-green-200'
+                        : 'bg-yellow-50 border border-yellow-200'
+                    }`}>
+                      <div className="flex items-center">
+                        {result.validation.is_valid ? (
+                          <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
+                        )}
+                        <h4 className="font-semibold text-gray-900">
+                          {result.validation.is_valid ? 'Valid' : 'Needs Review'}
+                        </h4>
+                      </div>
+                      {result.validation.requires_human_review && (
+                        <p className="text-sm text-gray-600 mt-2">
+                          This invoice requires human review
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* JSON View */}
+                  <details className="bg-gray-900 rounded-lg">
+                    <summary className="text-white p-4 cursor-pointer font-semibold">
+                      View Raw JSON Data
+                    </summary>
+                    <pre className="text-green-400 text-sm p-4 overflow-x-auto">
+                      {JSON.stringify(result, null, 2)}
+                    </pre>
+                  </details>
+
+                  {result.demo && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> This is demo data. To process real invoices, set up the Python backend service.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -143,75 +448,6 @@ export default function Demo() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Example Output */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">
-            Example Output
-          </h2>
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <div className="bg-gray-900 rounded-lg p-6 overflow-x-auto">
-              <pre className="text-green-400 text-sm">
-                <code>{JSON.stringify(exampleOutput, null, 2)}</code>
-              </pre>
-            </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 mb-2">Extracted</div>
-                <div className="text-gray-600">Structured JSON data with all invoice fields</div>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-600 mb-2">Validated</div>
-                <div className="text-gray-600">Data verified for accuracy and completeness</div>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600 mb-2">Stored</div>
-                <div className="text-gray-600">Saved to Google Sheets automatically</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Highlight */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">
-            Key Benefits
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <PlayCircle className="h-10 w-10 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Fast Processing</h3>
-              <p className="text-gray-600">Process invoices in under 5 seconds</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-10 w-10 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">High Accuracy</h3>
-              <p className="text-gray-600">95%+ extraction accuracy with validation</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Brain className="h-10 w-10 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">AI-Powered</h3>
-              <p className="text-gray-600">Intelligent parsing with Gemini AI</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Save className="h-10 w-10 text-orange-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Auto-Save</h3>
-              <p className="text-gray-600">Automatic Google Sheets integration</p>
-            </div>
           </div>
         </div>
       </section>

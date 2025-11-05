@@ -7,8 +7,12 @@ import Footer from '@/components/Footer'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI Invoice Extraction System | Intelligent Document Processing',
+  title: 'InvoiceAI | Smart Document Processing with AI',
   description: 'Advanced AI-powered invoice extraction system using OCR and Gemini AI for automated document processing and data extraction.',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
